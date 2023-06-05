@@ -3,52 +3,40 @@ import asyncio
 import itertools
 import string
 from alive_progress import alive_bar
-from yarl import URL
-from http.cookies import BaseCookie
 from bs4 import BeautifulSoup
 
 
-async def test_username(username: str, session: aiohttp.ClientSession, auth_token: str) -> bool:
-    inum = '0'
-    headers = {'Content-Type': f'multipart/form-data; boundary=---------------------------{inum}'}
-    data = f'-----------------------------{inum}\r\nContent-Disposition: form-data; name="authenticity_token"\r\n\r\n{auth_token}\r\n-----------------------------{inum}\r\nContent-Disposition: form-data; name="value"\r\n\r\n{username}\r\n-----------------------------{inum}--\r\n'
+async def username_available(username: str, session: aiohttp.ClientSession, auth_token: str) -> bool:
+    headers = {'Content-Type': 'multipart/form-data; boundary=---------------------------'}
+    data = '-----------------------------\r\nContent-Disposition: form-data; name="authenticity_token"\r\n\r\n' \
+           f'{auth_token}\r\n-----------------------------\r\nContent-Disposition: form-data; name="value"\r\n\r\n' \
+           f'{username}\r\n-------------------------------\r\n'
 
     async with session.post('/signup_check/username', data=data, headers=headers) as resp:
         message = await resp.text()
-        if message == f'{username} is available.': return True
-        else:
-            print(f'{username} is not available')
-            return False
+        return True if message == f'{username} is available.' else False
 
 
-async def session_setup(session: aiohttp.ClientSession) -> (BaseCookie[str], str):
+async def get_token(session: aiohttp.ClientSession) -> str:
     async with session.get('/signup') as resp:
-        cookies = session.cookie_jar.filter_cookies(URL('https://github.com'))
-        token = await extract_auth_token(await resp.text())
-        return cookies, token
-
-
-async def extract_auth_token(text: str) -> str:
-    soup = BeautifulSoup(text, 'html.parser')
-    res = soup.findAll('auto-check', src='/signup_check/username')
-    return res[0].contents[3]['value']
+        soup = BeautifulSoup(await resp.text(), 'html.parser')
+        res = soup.findAll('auto-check', src='/signup_check/username')
+        return res[0].contents[3]['value']
 
 
 async def generate_usernames(n: int) -> list:
     let = list(string.ascii_lowercase) + list(string.digits)
     names = [''.join(i) for i in itertools.product(let, repeat=n)]
-    print(f'{len(names)} usernames to test')
+    print(f'{len(names)} usernames generated')
     return names
 
 
 async def worker(queue: asyncio.Queue) -> None:
-    nt_cookies = None
-    async with aiohttp.ClientSession('https://github.com/', cookies=nt_cookies) as nt_session:
-        rc_cookies, token = await session_setup(nt_session)
+    async with aiohttp.ClientSession('https://github.com/') as sess:
+        token = await get_token(sess)
         while True:
             name = await queue.get()
-            res = await test_username(name, nt_session, token)
-            if res:
+            if await username_available(name, sess, token):
                 print(f'Username {name} is available!')
             queue.task_done()
 
