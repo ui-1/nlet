@@ -2,6 +2,8 @@ import aiohttp
 import asyncio
 import itertools
 import string
+import sys
+import re
 from alive_progress import alive_bar
 from bs4 import BeautifulSoup
 
@@ -12,16 +14,16 @@ async def username_available(username: str, session: aiohttp.ClientSession, auth
            f'{auth_token}\r\n-----------------------------\r\nContent-Disposition: form-data; name="value"\r\n\r\n' \
            f'{username}\r\n-------------------------------\r\n'
 
-    async with session.post('/signup_check/username', data=data, headers=headers) as resp:
-        message = await resp.text()
+    async with session.post('/signup_check/username', data=data, headers=headers) as response:
+        message = await response.text()
         return True if message == f'{username} is available.' else False
 
 
 async def get_token(session: aiohttp.ClientSession) -> str:
-    async with session.get('/signup') as resp:
-        soup = BeautifulSoup(await resp.text(), 'html.parser')
-        res = soup.findAll('auto-check', src='/signup_check/username')
-        return res[0].contents[3]['value']
+    async with session.get('/signup') as response:
+        soup = BeautifulSoup(await response.text(), 'html.parser')
+        result = soup.findAll('auto-check', src='/signup_check/username')
+        return result[0].contents[3]['value']
 
 
 async def generate_usernames(n: int) -> list:
@@ -37,12 +39,12 @@ async def generate_usernames(n: int) -> list:
 
 
 async def worker(queue: asyncio.Queue) -> None:
-    async with aiohttp.ClientSession('https://github.com/') as sess:
-        token = await get_token(sess)
-        while True:
-            name = await queue.get()
-            if await username_available(name, sess, token):
-                print(f'Username {name} is available!')
+    async with aiohttp.ClientSession('https://github.com/') as session:
+        token = await get_token(session)
+        while queue.qsize() != 0:
+            username = await queue.get()
+            if await username_available(username, session, token):
+                print(f'Username \'{username}\' is available!')
             queue.task_done()
 
 
@@ -58,11 +60,17 @@ async def progress_monitor(queue: asyncio.Queue) -> None:
             previous_size = current_size
 
 
-async def main(length: int, num_workers: int=1) -> None:
-    names = await generate_usernames(length)
+async def main(num_workers: int=512) -> None:
+    try:
+        assert len(sys.argv) == 2
+        assert sys.argv[1].isnumeric() and 39 >= int(sys.argv[1]) >= 1
+    except AssertionError:
+        raise SystemExit(f'Usage: {sys.argv[0]} <username length (1 <= n <= 39)>')
+
+    usernames = await generate_usernames(int(sys.argv[1]))
 
     queue = asyncio.Queue()
-    for name in names: queue.put_nowait(name)
+    for u in usernames: queue.put_nowait(u)
 
     workers = []
     for _ in range(num_workers):
@@ -77,4 +85,4 @@ async def main(length: int, num_workers: int=1) -> None:
 
 
 if __name__ == '__main__':
-    asyncio.run(main(4))
+    asyncio.run(main())
