@@ -25,10 +25,15 @@ async def get_token(session: aiohttp.ClientSession) -> str:
 
 
 async def generate_usernames(n: int) -> list:
-    let = list(string.ascii_lowercase) + list(string.digits)
-    names = [''.join(i) for i in itertools.product(let, repeat=n)]
-    print(f'{len(names)} usernames generated')
-    return names
+    # Strategy: generate all n-letter combinations of a-z + 1-9 + '-'
+    # and then remove the few that are not valid usernames
+    letters = list(string.ascii_lowercase) + list(string.digits) + ['-']
+    usernames = [''.join(i) for i in itertools.product(letters, repeat=n)]
+    github_username_pattern = re.compile('^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$')
+    usernames = [u for u in usernames if github_username_pattern.match(u) is not None]
+    usernames.sort()
+    print(f'Generated {len(usernames)} usernames')
+    return usernames
 
 
 async def worker(queue: asyncio.Queue) -> None:
