@@ -27,7 +27,7 @@ Clone the repository:
 `git clone https://github.com/ui-1/nlet.git`
 
 Run the script, specifying the amount of letters as the only argument:  
-`python main.py 1`
+`python main.py 4`
 
 ## bonus
 
