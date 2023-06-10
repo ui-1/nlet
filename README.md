@@ -26,6 +26,9 @@ What we do here instead is emulating that part of the registration process where
 Clone the repository:  
 `git clone https://github.com/ui-1/nlet.git`
 
+Install dependencies:  
+`pip install -r requirements.txt`
+
 Run the script, specifying the amount of letters as the only argument:  
 `python main.py 4`
 
