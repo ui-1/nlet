@@ -27,7 +27,7 @@ async def get_token(session: aiohttp.ClientSession) -> str:
 
 
 async def generate_usernames(n: int) -> list:
-    # Strategy: generate all n-letter combinations of a-z + 1-9 + '-'
+    # Strategy: generate all n-letter combinations of a-z + 0-9 + '-'
     # and then remove the few that are not valid usernames
     letters = list(string.ascii_lowercase) + list(string.digits) + ['-']
     usernames = [''.join(i) for i in itertools.product(letters, repeat=n)]
